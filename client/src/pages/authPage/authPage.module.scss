@@ -1,0 +1,131 @@
+@use '../../assets/variables.scss' as *;
+
+
+.authPage{
+    height: 100%;
+    padding: 0px 20px;
+
+    .authPageInner{
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        .auth_card{
+            border-radius: 10px;
+            box-shadow: 1px 0px 10px 0px #111;
+            padding: 50px 100px;
+
+            .buttons{
+                display: block;
+                text-align: center;
+                margin-bottom: 30px;
+
+                & > h2{
+                    font-size: 24px;
+                }
+
+                & > .buttons_botText{
+                    display: flex;
+                    align-items: center;
+                    gap: 3px;
+
+                    & > button{
+                        background-color: #ffff0000;
+                        border: 0px;
+                        border-bottom: 1px #111 solid;
+                        padding: 0;
+                        font-weight: 600;
+                        cursor: pointer;
+                    }
+                }
+
+                
+
+            }
+
+            .registration{
+                    flex-direction: column;
+                    display: flex;
+                    gap: 40px;
+
+                    & > .username_reg{
+
+                        & > p{
+                            font-size: 14px;
+                            text-align: center;
+                            margin-bottom: 5px;
+                        }
+
+                        & > input{
+                            height: 25px;
+                            width: 100%;
+                            border-radius: 5px;
+                            padding-left: 10px;
+                            &:focus{
+                                outline: none;
+                            }
+                        }
+
+                    }
+
+                    & > .password_reg{
+
+                        & > p{
+                            font-size: 14px;
+                            text-align: center;
+                            margin-bottom: 5px;
+                        }
+
+                        & > input{
+                            height: 25px;
+                            width: 100%;
+                            border-radius: 5px;
+                            padding-left: 10px;
+                            &:focus{
+                                outline: none;
+                            }
+                        }
+
+                    }
+
+                    & > .passwordRepeat_reg{
+
+                        & > p{
+                            font-size: 14px;
+                            text-align: center;
+                            margin-bottom: 5px;
+                        }
+
+                        & > input{
+                            height: 25px;
+                            width: 100%;
+                            border-radius: 5px;
+                            padding-left: 10px;
+                            &:focus{
+                                outline: none;
+                            }
+                        }
+
+                    }
+
+                    .reg_button{
+                        display: flex;
+        
+                        & > button{
+                            width: 100%;
+                            padding: 5px 0px 5px 0px;
+                            background-color: #ffff0000;
+                            border-radius: 5px;
+                            cursor: pointer;
+                        }
+        
+                    }
+
+            }
+             
+
+
+        }
+    }
+}

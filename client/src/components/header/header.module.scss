@@ -1,0 +1,38 @@
+@use '../../assets/variables.scss' as *;
+
+header{
+    padding: 10px 20px;
+
+    .headerInner{
+        display: flex;
+        justify-content: end;
+        align-items: center;
+        .accountInfo{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            & > p{
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            & > .seperator{
+                height: 30px;
+                width: 2px;
+                background-color: #a3a3a3;
+            }
+
+            & > .logout_button{
+                padding: 10px 30px;
+                font-size: 14px;
+                font-weight: 600;
+                background-color: #ffffff00;
+                border: 2px $main-color solid;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+        }
+    }
+}
