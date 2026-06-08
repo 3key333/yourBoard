@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { RegistrationNewUser } from "../types";
+import { IUser, RegistrationNewUser } from "../types";
 import { throwServerError } from "../helpers/helpers";
 import dotenv from 'dotenv';
 import { pool } from '../db/pool';
@@ -75,4 +75,31 @@ authRouter.post('/', async (req: Request<{}, {}, RegistrationNewUser>, res: Resp
         throwServerError(res, error)
     }
     
+})
+
+authRouter.post('/login', async (req: Request<{}, {}, {name: string, password: string}>, res: Response) => {
+    
+    try {
+
+        const {name, password} = req.body
+
+        const user = await pool.query<IUser>(
+            `SELECT * FROM users
+            WHERE user_name = $1`,
+            [name]
+        )
+
+        if(user.rows.length === 0){
+            res.status(400).json({message: 'Пользователь не был зарегестрирован'})
+            return
+        }
+
+        const isCurrentPassword = await bcrypt.compare(password, user.rows[0].password_hash)
+
+        res.status(200).json({message: 'Пользователь успешно вошел в аккаунт', data: user.rows[0]})
+
+    } catch (error) {
+        throwServerError(res, error)
+    }
+
 })

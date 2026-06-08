@@ -1,34 +1,48 @@
 import { useState } from 'react';
 import style from './header.module.scss';
 import axios from 'axios';
-import { useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from '../../redux/store';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 
 export const Header = () => {
-    
-    const dispatch = useDispatch<AppDispatch>()
+
+    const navigate = useNavigate()
+    const location = useLocation()
 
     const token = localStorage.getItem('token')
 
+    if(!token){
+        navigate('/')
+    }
+
     const [userName, setUserName] = useState<string>('')
 
-    const { user } = useSelector((state: RootState) => state.auth)
+    const userInfoFromLocalStorage = localStorage.getItem('userInfo')
 
     const searchUser = async () => {
-        const data = await axios.get('http://localhost:3000/api/user/:id')
+        const { data } = await axios.get(`http://localhost:3000/api/user/${JSON.parse(userInfoFromLocalStorage).id}`)
+        setUserName(data.data[0].user_name)
+    }
+
+    if(userInfoFromLocalStorage){
+        searchUser()
+    }
+
+    const logoutFromAccount = () => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
     }
     
     return(
         <header>
             <div className={style.headerInner}>
-                <div className={style.accountInfo} style={{display: token?'flex':'none'}}>
+                <div className={style.accountInfo} style={{display: location.pathname==='/'?'none':'flex'}}>
 
-                    <p>name</p>
+                    <p>{userName}</p>
 
                     <div className={style.seperator}></div>
                     
-                    <button className={style.logout_button}>выйти</button>
+                    <Link to={'/'} className={style.logout_button} onClick={logoutFromAccount}>выйти</Link>
 
                 </div>
             </div>
