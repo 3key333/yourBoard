@@ -4,7 +4,7 @@ export interface RegistrationNewUser{
     passwordRepeat: string;
 }
 
-export interface IUser {
+export interface IUserEntity {
     id: string;
     user_name: string;
     password_hash: string;

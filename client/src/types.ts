@@ -8,3 +8,9 @@ export interface RegistrationNewUser{
         };
 
 }
+
+export interface IUserEntity {
+    id: string;
+    user_name: string;
+    password_hash: string;
+}

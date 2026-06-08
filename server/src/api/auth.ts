@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { IUser, RegistrationNewUser } from "../types";
+import { IUserEntity, RegistrationNewUser } from "../types";
 import { throwServerError } from "../helpers/helpers";
 import dotenv from 'dotenv';
 import { pool } from '../db/pool';
@@ -56,9 +56,9 @@ authRouter.post('/', async (req: Request<{}, {}, RegistrationNewUser>, res: Resp
         const secretKey = String(process.env.JWT_SECRET)
         
         const token = jwt.sign(
-            {userId: result.rows[0].id, userName: result.rows[0].user_name},
-            secretKey,
-            {expiresIn: '24h'}
+            {userId: result.rows[0].id, userName: result.rows[0].user_name}, // данные 
+            secretKey,                                                       // секрет
+            {expiresIn: '24h'}                                               // настройки
         )
 
         
@@ -83,7 +83,7 @@ authRouter.post('/login', async (req: Request<{}, {}, {name: string, password: s
 
         const {name, password} = req.body
 
-        const user = await pool.query<IUser>(
+        const user = await pool.query<IUserEntity>(
             `SELECT * FROM users
             WHERE user_name = $1`,
             [name]
@@ -94,9 +94,22 @@ authRouter.post('/login', async (req: Request<{}, {}, {name: string, password: s
             return
         }
 
-        const isCurrentPassword = await bcrypt.compare(password, user.rows[0].password_hash)
+        const isCurrentPassword = await bcrypt.compare(password, user.rows[0].password_hash) // сравнивает пароли
 
-        res.status(200).json({message: 'Пользователь успешно вошел в аккаунт', data: user.rows[0]})
+        if(!isCurrentPassword){
+            res.status(200).json({message: 'Неправильный пароль или имя аккаунта'})
+            return
+        }
+
+        const secretKey = String(process.env.JWT_SECRET)
+
+        const token = jwt.sign(
+            {userId: user.rows[0].id, userName: user.rows[0].user_name},
+            secretKey,
+            {expiresIn: '24h'}
+        )
+
+        res.status(200).json({message: 'Пользователь успешно вошел в аккаунт', token: token, data: user.rows[0]})
 
     } catch (error) {
         throwServerError(res, error)

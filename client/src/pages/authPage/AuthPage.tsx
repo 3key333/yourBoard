@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import style from './authPage.module.scss'
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios'
-import type { RegistrationNewUser } from '../../types';
+import type { IUserEntity, RegistrationNewUser } from '../../types';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../redux/store';
 import { setUserInfo } from '../../redux/slices/authSlice';
@@ -18,8 +18,17 @@ interface UserReg{
 export const AuthPage = () => {
 
     const navigate = useNavigate()
+    const location = useLocation()
 
     const dispatch = useDispatch<AppDispatch>()
+
+    const token = localStorage.getItem('token')
+
+    useEffect(() => {
+        if(token){
+            navigate('board')
+        }
+    }, [location.pathname])
 
     const [regForm, setRegForm] = useState<UserReg>({
         userName: '',
@@ -33,6 +42,9 @@ export const AuthPage = () => {
     regForm.password.trim() !== '' && 
     regForm.passwordRepeat.trim() !== '' &&
     regForm.password.trim() === regForm.passwordRepeat.trim()
+
+    const validateLogin = regForm.userName.trim() !== '' &&
+    regForm.password.trim() !== ''
 
     const handleChangeReg = (e: React.ChangeEvent<HTMLInputElement>) => {
         setRegForm((prev) => ({...prev, [e.target.name]:e.target.value}))
@@ -56,6 +68,21 @@ export const AuthPage = () => {
 
             navigate('/board')
 
+        }
+    }
+
+    const handleClickToLogin = async () => {
+
+        if(validateLogin){
+            const data = await axios.post<{message: string, token: string, data: IUserEntity}>(
+                `http://localhost:3000/api/auth/login`,
+                {name: regForm.userName, password: regForm.password}
+            )
+
+            localStorage.setItem('token', data.data.token)
+            dispatch(setUserInfo({id: data.data.data.id, name: data.data.data.user_name,}))
+
+            navigate('/board')
         }
     }
 
@@ -133,7 +160,7 @@ export const AuthPage = () => {
                             <hr />
 
                             <div className={style.reg_button}>
-                                <button disabled={!validate} onClick={handleClickToReg}>зарегистрироваться</button>
+                                <button disabled={!validateLogin} onClick={handleClickToLogin}>войти</button>
                             </div>
 
                         </div>
