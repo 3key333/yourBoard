@@ -1,14 +1,50 @@
-import style from './board.module.scss'
-import { usePortal } from '../../hooks/usePortal'
-import { useState, type DragEvent } from 'react'
-import { Portal } from '../../components/portal/portalModule'
-import { useDispatch, useSelector } from 'react-redux'
-import type { AppDispatch, RootState } from '../../redux/store'
-import { addNewTask, deleteTask } from '../../redux/slices/boardSlice'
+import style from './board.module.scss';
+import { usePortal } from '../../hooks/usePortal';
+import { useEffect, useState } from 'react';
+import { Portal } from '../../components/portal/portalModule';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../redux/store';
+import { addNewTask, deleteTask, moveTask } from '../../redux/slices/boardSlice';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
+import { io, type Socket } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
+
 
 export const Board = () => {
 
     const dispatch = useDispatch<AppDispatch>()
+
+    const { user } = useSelector((state: RootState) => state.auth)
+
+    const navigate = useNavigate()
+
+    const [socket, setSocket] = useState<Socket | null>(null)
+
+    useEffect(() => {
+        
+        const newSocket = io('http://localhost:3000')
+
+        setSocket(newSocket)
+
+        newSocket.on('connect', () => {
+
+            newSocket.emit('join_room', {userName: user.name, roomName: user.room})
+
+            newSocket.on('add_task', (data: {roomName: string, taskName: string}) => {
+                dispatch(addNewTask(data.taskName))
+            })
+
+            newSocket.on('delete_task', (data: {columnName: string, taskName: string}) => {
+                dispatch(deleteTask(data))
+            })
+        })
+
+        return () => {
+            newSocket.disconnect()
+        }
+
+    }, [navigate])
 
     const { isOpen, changePortal } = usePortal()
 
@@ -24,6 +60,7 @@ export const Board = () => {
         changePortal()
         setNewTaskName('')
         if(newTaskName.trim() !== ''){
+            socket.emit('add_task', {roomName: user.room, taskName: newTaskName})
             dispatch(addNewTask(newTaskName))
         }
     }
@@ -34,30 +71,45 @@ export const Board = () => {
 
     
     // D & D 
-    const [currentDragTask, setCurrentDragTask] = useState<string>('')
 
-    const dragStartHandler = (e: DragEvent<HTMLDivElement>, taskName) => {
-        console.log('drag', taskName)
-        setCurrentDragTask(taskName)
+    const onDragEnd = (result: DropResult) => {
+        const { source, destination, draggableId } = result
+
+        // destination = null → бросил мимо колонки, ничего не делаем
+        if(!destination) return
+
+        // та же колонка и та же позиция → задача не сдвинулась
+        if(
+            source.droppableId === destination.droppableId && 
+            source.index === destination.index
+        ){
+            return
+        }
+
+        // source / destination    — откуда и куда
+        // source.droppableId      — id колонки-источника ('plan', 'process', 'ready')
+        // source.index            — индекс задачи в массиве
+        // destination.droppableId — id колонки-назначения
+        // destination.index       — куда вставить
+        // draggableId             — id перетаскиваемой задачи (обычно taskName)
+
+        dispatch(moveTask({
+            fromColumn: source.droppableId, 
+            toColumn: destination.droppableId, 
+            fromIndex: source.index, 
+            toIndex: destination.index
+        }))
+
+        socket.emit('move_task', {
+            roomName: user.room, 
+            fromColumn: source.droppableId, 
+            toColumn: destination.droppableId,
+            fromIndex: source.index,
+            toIndex: destination.index
+        })
+
     }
-
-    const dragLeaveHandler = (e: DragEvent<HTMLDivElement>) => {
-
-    }
-
-    const dragEndHandler = (e: DragEvent<HTMLDivElement>) => {
-
-    }
-
-    const dragOverHandler = (e: DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
-    }
-
-    const dragDropHandler = (e: DragEvent<HTMLDivElement>, taskName) => {
-        e.preventDefault()
-        console.log('drop', taskName)
-
-    }
+    
 
 
     return(
@@ -115,62 +167,167 @@ export const Board = () => {
                     </Portal>
                 )}
 
-                    <div className={`${style.column_plan} ${style.column}`}>
+                    <DragDropContext onDragEnd={onDragEnd}>
+                        {/* DragDropContext — это корневой компонент, который должен оборачивать все Droppable и Draggable компоненты.
+                        Он принимает колбэк onDragEnd, который вызывается после завершения перетаскивания . */}
+                        
+                        <div className={`${style.column_plan} ${style.column}`}>
 
                         <div className={style.column_title}>
                             <h2>в планах</h2>
                         </div>
 
-                        <div className={`${style.list_plan} ${style.list}`}>
-                            {board.plan.map((taskName) => (
-                                <div key={taskName}>
-                                    <div 
-                                     className={style.list_task}
-                                     draggable={true}
-                                     onDragStart={(e) => dragStartHandler(e, taskName) } // сработает когда возьмем блок
-                                     onDragLeave={(e) => dragLeaveHandler(e)}            // сработает когда выйдем за предел другого блока
-                                     onDragEnd={(e) => dragEndHandler(e)}                // сработает когда отпустим перемещение
-                                     onDragOver={(e) => dragOverHandler(e)}              // сработает когда мы находимся над другим блоком 
-                                     onDrop={(e) => dragDropHandler(e, taskName)}        // сработает когда мы отпустили блок и расчитываем на действие
+                        {/* Droppable = зона, куда можно бросить карточки */}
 
-                                    >
-                                        {(taskName).slice(0, 30)}
-                                        <button onClick={() => handlerClickToDeleteTask({columnName: 'plan', taskName: taskName})}>x</button>
-                                    </div>
-                                    <hr />
-                                </div>
-                            ))}
-                        </div>
+                        <Droppable droppableId='plan'>
+                            {(provided, snapshot) => (
+                                <div 
+                                    className={`${style.list_plan} ${style.list}`}
+                                    ref={provided.innerRef}        // ОБЯЗАТЕЛЬНО — без ref D&D не работает
+                                    {...provided.droppableProps}   // слушатели drop-зоны
+                                    style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}  // подсветка при наведении
+                                >
+
+                                    {board.plan.map((taskName, index) => (
+                                        /* Draggable = одна таска */
+                                        <Draggable 
+                                            key={taskName}            // key для React
+                                            draggableId={taskName}    // уникальный id (если 2 задачи с одним именем — будет ошибка!)
+                                            index={index}             // позиция в массиве — ОБЯЗАТЕЛЬНО
+                                        >
+                                            {(provided, snapshot) => (
+                                                <div
+                                                    ref={provided.innerRef}       // ref на перетаскиваемый элемент
+                                                    {...provided.draggableProps}  // позиция при drag
+                                                    {...provided.dragHandleProps} // за что хвататься (можно только на часть карточки)
+                                                    className={style.task_line}
+                                                    style={{
+                                                        ...provided.draggableProps.style,
+                                                        opacity: snapshot.isDragging ? 0.7 : 1,
+                                                    }}
+                                                >
+                                                    <div className={style.list_task}>
+                                                        {(taskName).slice(0, 30)}
+                                                        <button onClick={() => handlerClickToDeleteTask({columnName: 'plan', taskName: taskName})}>x</button>
+                                                    </div>
+
+                                                    <hr />
+
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {/* placeholder — резервирует место, пока тащишь карточку */}
+                                    {provided.placeholder}
+                               </div>
+                            )} 
+                        </Droppable>
 
                         <div className={style.addNewTask_button}>
                             <button onClick={changePortal}>добавить задачу</button>
                         </div>
 
-                    </div>
+                        </div>
 
-                    <div className={`${style.column_process} ${style.column}`}>
+                        <div className={`${style.column_process} ${style.column}`}>
 
-                        <div className={style.column_title}>
+                            <div className={style.column_title}>
                             <h2>в процессе</h2>
+                            </div>
+
+                            <Droppable droppableId='process'>
+                                {(provided, snapshot) => (
+                                    <div
+                                        className={`${style.list_process} ${style.list}`}
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                        style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}
+                                    >
+                                        
+                                        {board.process.map((taskName,index) => (
+                                            <Draggable
+                                                key={taskName}
+                                                draggableId={taskName}
+                                                index={index}
+                                            >
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                    ref={provided.innerRef}       // ref на перетаскиваемый элемент
+                                                    {...provided.draggableProps}  // позиция при drag
+                                                    {...provided.dragHandleProps} // за что хвататься (можно только на часть карточки)
+                                                    className={style.task_line}
+                                                    style={{
+                                                        ...provided.draggableProps.style,
+                                                        opacity: snapshot.isDragging ? 0.7 : 1,
+                                                    }}
+                                                >
+                                                    <div className={style.list_task}>
+                                                        {(taskName).slice(0, 30)}
+                                                        <button onClick={() => handlerClickToDeleteTask({columnName: 'process', taskName: taskName})}>x</button>
+                                                    </div>
+
+                                                    <hr />
+                                                    
+                                                </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+
                         </div>
 
-                        <div className={`${style.list_process} ${style.list}`}>
+                        <div className={`${style.column_ready} ${style.column}`}>
+
+                            <div className={style.column_title}>
+                                <h2>готово</h2>
+                            </div>
+
+                            <Droppable droppableId='ready'>
+                                {(provided, snapshot) => (
+                                    <div
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                        className={`${style.list_ready} ${style.list}`}
+                                        style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}
+                                    >
+                                        {board.ready.map((taskName, index) => (
+                                            <Draggable
+                                                key={taskName}
+                                                draggableId={taskName}
+                                                index={index}
+                                            >
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                        className={style.task_line}
+                                                        style={{
+                                                            ...provided.draggableProps.style,
+                                                            opacity: snapshot.isDragging ? 0.7 : 1,
+                                                        }}
+                                                    >
+                                                        <div className={style.list_task}>
+                                                            {(taskName).slice(0, 30)}
+                                                            <button onClick={() => handlerClickToDeleteTask({columnName: 'ready', taskName: taskName})}>x</button>
+                                                        </div>
+
+                                                        <hr />
+                                                    </div>
+                                                )}       
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
 
                         </div>
 
-                    </div>
-
-                    <div className={`${style.column_ready} ${style.column}`}>
-
-                        <div className={style.column_title}>
-                            <h2>готово</h2>
-                        </div>
-
-                        <div className={`${style.list_ready} ${style.list}`}>
-
-                        </div>
-
-                    </div>
+                    </DragDropContext>
                 
             </div>
         </section>

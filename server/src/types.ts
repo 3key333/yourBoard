@@ -9,3 +9,11 @@ export interface IUserEntity {
     user_name: string;
     password_hash: string;
 }
+
+export interface MoveTaskSocketData {
+    roomName: any;
+    fromColumn: any; 
+    toColumn: any;
+    fromIndex: any;
+    toIndex: any;
+}

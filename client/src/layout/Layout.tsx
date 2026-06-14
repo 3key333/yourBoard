@@ -4,6 +4,7 @@ import { Footer } from "../components/footer/Footer"
 import { AuthPage } from "../pages/authPage/AuthPage"
 import style from "./layout.module.scss"
 import { Board } from "../pages/board/Board"
+import { JoinRoomPage } from "../pages/joinRoomPage/JoinRoomPage"
 
 
 export const Layout = () => {
@@ -15,6 +16,7 @@ export const Layout = () => {
                     <Routes>
                         <Route path="/" element={<AuthPage />}/>
                         <Route path="/board" element={<Board />}/>
+                        <Route path="/joinRoom" element={<JoinRoomPage/>}/>
                     </Routes>
                 </main>
                 <Footer/>

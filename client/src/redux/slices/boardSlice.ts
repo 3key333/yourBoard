@@ -30,6 +30,17 @@ const boardSlice = createSlice({
         deleteTask: (state, action) => {
             const payload: {columnName: string, taskName: string} = action.payload
             state.board[payload.columnName] = state.board[payload.columnName].filter((name) => name !== payload.taskName)
+        },
+
+        moveTask: (state, action) => {
+            // payload приходит из onDragEnd
+            const { fromColumn, toColumn, fromIndex, toIndex } = action.payload
+
+            // 1. Вырезаем задачу из исходной колонки
+            const [ task ] = state.board[fromColumn].splice(fromIndex, 1)
+
+            // 2. Вставляем в целевую колонку на новую позицию
+            state.board[toColumn].splice(toIndex, 0, task)
         }
 
     }
@@ -38,5 +49,6 @@ const boardSlice = createSlice({
 export default boardSlice.reducer
 export const {
     addNewTask,
-    deleteTask
+    deleteTask,
+    moveTask
 } = boardSlice.actions

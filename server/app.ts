@@ -1,6 +1,6 @@
 import "dotenv/config"
 import { initDataBase } from "./src/db/pool"
-import { createServer, startServer } from "./src/server"
+import { createAppServer, startServer } from "./src/server"
 import { authRouter } from "./src/api/auth"
 import { userRouter } from './src/api/user'
 
@@ -8,12 +8,12 @@ const startApp = async () => {
     try {
 
         await initDataBase()
-        const app = createServer()
+        const {app, httpServer} = createAppServer()
 
         app.use('/api/auth', authRouter)
         app.use('/api/user', userRouter)
 
-        startServer(app)
+        startServer(httpServer)
 
     } catch (error) {
         console.log("не удалось запустить приложенее", error)

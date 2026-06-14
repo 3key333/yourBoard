@@ -1,0 +1,57 @@
+.joinRoom{
+    flex: 1;
+    height: 100%;
+    padding: 0px 20px;
+    .joinRoomInner{
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        .joinRoom_card{
+            border-radius: 10px;
+            box-shadow: 1px 0px 10px 0px #111;
+            padding: 50px 20px;
+            height: 537px;
+            width: 484px;
+            flex-direction: column;
+            display: flex;
+            justify-content: space-between;
+
+            .title{
+                text-align: center;
+
+                & > h2{
+                    font-size: 24px;
+                }
+
+                & > p{
+                    font-size: 12px;
+                }
+            }
+
+            .info{
+                flex-direction: column;
+                display: flex;
+                gap: 20px;
+
+                & > input{
+                    height: 40px;
+                    padding-left: 10px;
+                    
+                    &:focus{
+                        outline: none;
+                    }
+                    
+                }
+
+                & > button{
+                    background-color: #ffff0000;
+                    border-radius: 5px;
+                    height: 40px;
+                    cursor: pointer;
+                }
+            }
+        }
+    }
+}

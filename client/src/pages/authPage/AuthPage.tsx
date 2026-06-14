@@ -7,7 +7,6 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../redux/store';
 import { setUserInfo } from '../../redux/slices/authSlice';
 
-
 interface UserReg{
     userName: string;
     password: string;
@@ -26,7 +25,7 @@ export const AuthPage = () => {
 
     useEffect(() => {
         if(token){
-            navigate('board')
+            navigate('/joinRoom')
         }
     }, [location.pathname])
 
@@ -66,8 +65,7 @@ export const AuthPage = () => {
 
             console.log(data)
 
-            navigate('/board')
-
+            navigate('/joinRoom')
         }
     }
 
@@ -82,7 +80,7 @@ export const AuthPage = () => {
             localStorage.setItem('token', data.data.token)
             dispatch(setUserInfo({id: data.data.data.id, name: data.data.data.user_name,}))
 
-            navigate('/board')
+            navigate('/joinRoom')
         }
     }
 
