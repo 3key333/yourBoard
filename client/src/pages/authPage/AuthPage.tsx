@@ -22,10 +22,18 @@ export const AuthPage = () => {
     const dispatch = useDispatch<AppDispatch>()
 
     const token = localStorage.getItem('token')
+    const userInfo = localStorage.getItem('userInfo')
+    const JSONUserInfo = JSON.parse(userInfo)
+    const isUserFullReg =  JSONUserInfo && 
+    JSONUserInfo.id &&
+    JSONUserInfo.id.trim() !== '' &&
+    JSONUserInfo.name &&
+    JSONUserInfo.name.trim() !== '' && 
+    JSONUserInfo.room !== undefined
 
     useEffect(() => {
-        if(token){
-            navigate('/joinRoom')
+        if(isUserFullReg && token){
+            navigate('/board')
         }
     }, [location.pathname])
 

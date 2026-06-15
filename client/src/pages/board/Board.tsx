@@ -15,9 +15,12 @@ export const Board = () => {
 
     const dispatch = useDispatch<AppDispatch>()
 
-    const { user } = useSelector((state: RootState) => state.auth)
-
     const navigate = useNavigate()
+
+    const { user } = useSelector((state: RootState) => state.auth)
+    const rawJSONUserInfo = localStorage.getItem('userInfo')
+    if(!rawJSONUserInfo) navigate('/')
+    const userInfoJSON: {id: string, name: string, room: string} = JSON.parse(rawJSONUserInfo)
 
     const [socket, setSocket] = useState<Socket | null>(null)
 
@@ -29,7 +32,7 @@ export const Board = () => {
 
         newSocket.on('connect', () => {
 
-            newSocket.emit('join_room', {userName: user.name, roomName: user.room})
+            newSocket.emit('join_room', {userName: userInfoJSON.name, roomName: userInfoJSON.room})
 
             newSocket.on('add_task', (data: {roomName: string, taskName: string}) => {
                 dispatch(addNewTask(data.taskName))
@@ -37,6 +40,10 @@ export const Board = () => {
 
             newSocket.on('delete_task', (data: {columnName: string, taskName: string}) => {
                 dispatch(deleteTask(data))
+            })
+
+            newSocket.on('move_task', (data) => {
+                dispatch(moveTask(data))
             })
         })
 
@@ -60,13 +67,14 @@ export const Board = () => {
         changePortal()
         setNewTaskName('')
         if(newTaskName.trim() !== ''){
-            socket.emit('add_task', {roomName: user.room, taskName: newTaskName})
+            socket.emit('add_task', {roomName: userInfoJSON.room, taskName: newTaskName})
             dispatch(addNewTask(newTaskName))
         }
     }
     
     const handlerClickToDeleteTask = (info: {columnName: string, taskName: string}) => {
         dispatch(deleteTask({columnName: info.columnName, taskName: info.taskName}))
+        socket.emit('delete_task', {roomName: userInfoJSON.room, columnName: info.columnName, taskName: info.taskName})
     }
 
     
@@ -101,7 +109,7 @@ export const Board = () => {
         }))
 
         socket.emit('move_task', {
-            roomName: user.room, 
+            roomName: userInfoJSON.room, 
             fromColumn: source.droppableId, 
             toColumn: destination.droppableId,
             fromIndex: source.index,

@@ -29,11 +29,13 @@ export const createAppServer = (): {app: Express, httpServer: HttpServer, io: So
         })
 
         socket.on('add_task', (data: {roomName: string, taskName: string}) => {
-            io.to(data.roomName).emit('add_task', data)
+            console.log(data)
+            socket.broadcast.to(data.roomName).emit('add_task', data)
         })
 
         socket.on('delete_task', (data: {roomName: string, columnName: string, taskName: string}) => {
-            io.to(data.roomName).emit('delete_task', {columnName: data.columnName, taskName: data.taskName})
+            console.log(data)
+            socket.broadcast.to(data.roomName).emit('delete_task', {columnName: data.columnName, taskName: data.taskName})
         })
 
         socket.on('move_task', (data: MoveTaskSocketData) => {
@@ -43,7 +45,8 @@ export const createAppServer = (): {app: Express, httpServer: HttpServer, io: So
                 fromIndex: data.fromIndex, 
                 toIndex: data.toIndex
             }
-            io.to(data.roomName).emit('move_task', payload)
+            socket.broadcast.to(data.roomName).emit('move_task', payload)
+            console.log(data)
         })
 
         socket.on('disconnect', () => {
