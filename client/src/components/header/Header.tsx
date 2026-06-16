@@ -22,13 +22,14 @@ export const Header = () => {
 
         const userInfoFromLocalStorage = localStorage.getItem('userInfo')
 
-        const searchUser = async () => {
-            const { data } = await axios.get(`http://localhost:3000/api/user/${JSON.parse(userInfoFromLocalStorage).id}`)
+        const searchUser = async (userId: string) => {
+            const { data } = await axios.get(`http://localhost:3000/api/user/${userId}`)
             setUserName(data.data[0].user_name)
         }
 
-        if(userInfoFromLocalStorage){
-            searchUser()
+        if (userInfoFromLocalStorage) {
+            const { id } = JSON.parse(userInfoFromLocalStorage) as { id: string }
+            searchUser(id)
         }
 
     }, [location.pathname])

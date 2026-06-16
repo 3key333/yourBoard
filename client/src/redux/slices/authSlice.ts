@@ -33,8 +33,6 @@ const authSlice = createSlice({
         },
 
         setUserRoom: (state, action) => {
-            state.user.id = state.user.id
-            state.user.name = state.user.name
             state.user.room = action.payload
 
             localStorage.setItem('userInfo', JSON.stringify(state.user))

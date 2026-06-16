@@ -17,3 +17,27 @@ export interface MoveTaskSocketData {
     fromIndex: any;
     toIndex: any;
 }
+
+export interface AddNewTaskBody {
+    room_name: string; 
+    title: string; 
+    column_name: string; 
+    position: number;
+}
+
+export interface MoveTaskToUpdateBoard {
+    room_name: string,
+    title: string,
+    fromColumn: 'plan'| 'process'| 'ready',
+    toColumn: 'plan'| 'process'| 'ready',
+    fromIndex: number,
+    toIndex: number,
+}
+
+export interface ITaskEntity {
+    id: string;
+    room_name: string;
+    title: string;
+    column_name: 'plan'| 'process'| 'ready';
+    position: number;
+}

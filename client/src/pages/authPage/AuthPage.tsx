@@ -23,8 +23,8 @@ export const AuthPage = () => {
 
     const token = localStorage.getItem('token')
     const userInfo = localStorage.getItem('userInfo')
-    const JSONUserInfo = JSON.parse(userInfo)
-    const isUserFullReg =  JSONUserInfo && 
+    const JSONUserInfo = userInfo ? JSON.parse(userInfo) as { id?: string; name?: string; room?: string } : null
+    const isUserFullReg = JSONUserInfo && 
     JSONUserInfo.id &&
     JSONUserInfo.id.trim() !== '' &&
     JSONUserInfo.name &&
@@ -35,7 +35,7 @@ export const AuthPage = () => {
         if(isUserFullReg && token){
             navigate('/board')
         }
-    }, [location.pathname])
+    }, [location.pathname, isUserFullReg, token, navigate])
 
     const [regForm, setRegForm] = useState<UserReg>({
         userName: '',

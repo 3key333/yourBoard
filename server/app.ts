@@ -3,6 +3,8 @@ import { initDataBase } from "./src/db/pool"
 import { createAppServer, startServer } from "./src/server"
 import { authRouter } from "./src/api/auth"
 import { userRouter } from './src/api/user'
+import { tasksRouter } from "./src/api/tasks"
+
 
 const startApp = async () => {
     try {
@@ -12,6 +14,7 @@ const startApp = async () => {
 
         app.use('/api/auth', authRouter)
         app.use('/api/user', userRouter)
+        app.use('/api/tasks', tasksRouter)
 
         startServer(httpServer)
 

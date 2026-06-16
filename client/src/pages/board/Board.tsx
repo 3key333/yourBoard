@@ -1,6 +1,6 @@
 import style from './board.module.scss';
 import { usePortal } from '../../hooks/usePortal';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Portal } from '../../components/portal/portalModule';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../redux/store';
@@ -9,49 +9,75 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { io, type Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { loadBoard } from '../../redux/thunk/boardThunk';
 
+type ColumnName = 'plan' | 'process' | 'ready';
+
+interface UserInfo {
+    id: string;
+    name: string;
+    room: string;
+}
 
 export const Board = () => {
 
     const dispatch = useDispatch<AppDispatch>()
-
     const navigate = useNavigate()
 
-    const { user } = useSelector((state: RootState) => state.auth)
     const rawJSONUserInfo = localStorage.getItem('userInfo')
-    if(!rawJSONUserInfo) navigate('/')
-    const userInfoJSON: {id: string, name: string, room: string} = JSON.parse(rawJSONUserInfo)
 
-    const [socket, setSocket] = useState<Socket | null>(null)
+    const userInfoJSON = useMemo<UserInfo | null>(() => {
+        if (!rawJSONUserInfo) return null
+        return JSON.parse(rawJSONUserInfo) as UserInfo
+    }, [rawJSONUserInfo])
 
     useEffect(() => {
-        
-        const newSocket = io('http://localhost:3000')
+        if (!userInfoJSON) {
+            navigate('/')
+        }
+    }, [navigate, userInfoJSON])
 
-        setSocket(newSocket)
+    const socketRef = useRef<Socket | null>(null)
+
+    useEffect(() => {
+        if (!userInfoJSON) return
+
+        dispatch(loadBoard(userInfoJSON.room))
+    }, [dispatch, userInfoJSON])
+
+    useEffect(() => {
+        if (!userInfoJSON) return
+
+        const newSocket = io('http://localhost:3000')
+        socketRef.current = newSocket
 
         newSocket.on('connect', () => {
+            newSocket.emit('join_room', { userName: userInfoJSON.name, roomName: userInfoJSON.room })
 
-            newSocket.emit('join_room', {userName: userInfoJSON.name, roomName: userInfoJSON.room})
-
-            newSocket.on('add_task', (data: {roomName: string, taskName: string}) => {
+            newSocket.on('add_task', (data: { roomName: string; taskName: string }) => {
                 dispatch(addNewTask(data.taskName))
             })
 
-            newSocket.on('delete_task', (data: {columnName: string, taskName: string}) => {
+            newSocket.on('delete_task', (data: { columnName: ColumnName; taskName: string }) => {
                 dispatch(deleteTask(data))
             })
 
-            newSocket.on('move_task', (data) => {
+            newSocket.on('move_task', (data: {
+                fromColumn: ColumnName;
+                toColumn: ColumnName;
+                fromIndex: number;
+                toIndex: number;
+            }) => {
                 dispatch(moveTask(data))
             })
         })
 
         return () => {
             newSocket.disconnect()
+            socketRef.current = null
         }
-
-    }, [navigate])
+    }, [dispatch, userInfoJSON])
 
     const { isOpen, changePortal } = usePortal()
 
@@ -59,66 +85,87 @@ export const Board = () => {
 
     const { board } = useSelector((state: RootState) => state.board)
 
-    const handlerChangeNewTaskName = (text) => {
+    const handlerChangeNewTaskName = (text: string) => {
         setNewTaskName(text)
     }
 
-    const handlerClickToSendNewTask = () => {
+    const handlerClickToSendNewTask = async () => {
+        if (!userInfoJSON) return
+
         changePortal()
         setNewTaskName('')
-        if(newTaskName.trim() !== ''){
-            socket.emit('add_task', {roomName: userInfoJSON.room, taskName: newTaskName})
+        if (newTaskName.trim() !== '') {
+            socketRef.current?.emit('add_task', { roomName: userInfoJSON.room, taskName: newTaskName })
+            await axios.post('http://localhost:3000/api/tasks/add_task', {
+                room_name: userInfoJSON.room,
+                title: newTaskName,
+                column_name: 'plan',
+                position: board.plan.length
+            })
             dispatch(addNewTask(newTaskName))
         }
     }
-    
-    const handlerClickToDeleteTask = (info: {columnName: string, taskName: string}) => {
-        dispatch(deleteTask({columnName: info.columnName, taskName: info.taskName}))
-        socket.emit('delete_task', {roomName: userInfoJSON.room, columnName: info.columnName, taskName: info.taskName})
+
+    const handlerClickToDeleteTask = (info: { columnName: ColumnName; taskName: string }) => {
+        if (!userInfoJSON) return
+
+        dispatch(deleteTask(info))
+        socketRef.current?.emit('delete_task', {
+            roomName: userInfoJSON.room,
+            columnName: info.columnName,
+            taskName: info.taskName
+        })
+        axios.post('http://localhost:3000/api/tasks/delete_task', {
+            taskName: info.taskName,
+            room: userInfoJSON.room
+        })
     }
 
-    
-    // D & D 
+    const onDragEnd = async (result: DropResult) => {
+        if (!userInfoJSON) return
 
-    const onDragEnd = (result: DropResult) => {
         const { source, destination, draggableId } = result
 
-        // destination = null → бросил мимо колонки, ничего не делаем
-        if(!destination) return
+        if (!destination) return
 
-        // та же колонка и та же позиция → задача не сдвинулась
-        if(
-            source.droppableId === destination.droppableId && 
+        if (
+            source.droppableId === destination.droppableId &&
             source.index === destination.index
-        ){
+        ) {
             return
         }
 
-        // source / destination    — откуда и куда
-        // source.droppableId      — id колонки-источника ('plan', 'process', 'ready')
-        // source.index            — индекс задачи в массиве
-        // destination.droppableId — id колонки-назначения
-        // destination.index       — куда вставить
-        // draggableId             — id перетаскиваемой задачи (обычно taskName)
+        const fromColumn = source.droppableId as ColumnName
+        const toColumn = destination.droppableId as ColumnName
 
         dispatch(moveTask({
-            fromColumn: source.droppableId, 
-            toColumn: destination.droppableId, 
-            fromIndex: source.index, 
+            fromColumn,
+            toColumn,
+            fromIndex: source.index,
             toIndex: destination.index
         }))
 
-        socket.emit('move_task', {
-            roomName: userInfoJSON.room, 
-            fromColumn: source.droppableId, 
-            toColumn: destination.droppableId,
+        socketRef.current?.emit('move_task', {
+            roomName: userInfoJSON.room,
+            fromColumn,
+            toColumn,
             fromIndex: source.index,
             toIndex: destination.index
         })
 
+        await axios.put('http://localhost:3000/api/tasks/move_task', {
+            room_name: userInfoJSON.room,
+            title: draggableId,
+            fromColumn,
+            toColumn,
+            fromIndex: source.index,
+            toIndex: destination.index
+        })
     }
-    
 
+    if (!userInfoJSON) {
+        return null
+    }
 
     return(
         <section className={style.board}>
@@ -127,15 +174,15 @@ export const Board = () => {
                 {isOpen && (
                     <Portal>
                         <div className={style.portalInner} style={{
-                            flexDirection: 'column', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-around', 
+                            flexDirection: 'column',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-around',
                             height: '100%'}}
                         >
 
                             <div className={style.portal_newTask} style={{
-                                width: '100%', 
+                                width: '100%',
                                 textAlign: 'center'}}
                             >
 
@@ -144,10 +191,10 @@ export const Board = () => {
                                 </h2>
 
                                 <input type="text" style={{
-                                    textAlign: 'center', 
-                                    width: '300px', 
-                                    height: '30px', 
-                                    paddingLeft: 10, 
+                                    textAlign: 'center',
+                                    width: '300px',
+                                    height: '30px',
+                                    paddingLeft: 10,
                                     borderRadius: '5px',
                                     }}
                                     value={newTaskName}
@@ -159,10 +206,10 @@ export const Board = () => {
                             <div className={style.portal_addNewTask_button}>
 
                                 <button style={{
-                                    width: '300px', 
-                                    height: '30px', 
-                                    backgroundColor: '#ffff0000', 
-                                    borderRadius: '5px', 
+                                    width: '300px',
+                                    height: '30px',
+                                    backgroundColor: '#ffff0000',
+                                    borderRadius: '5px',
                                     cursor: 'pointer'}}
                                     onClick={handlerClickToSendNewTask}
                                 >
@@ -176,38 +223,33 @@ export const Board = () => {
                 )}
 
                     <DragDropContext onDragEnd={onDragEnd}>
-                        {/* DragDropContext — это корневой компонент, который должен оборачивать все Droppable и Draggable компоненты.
-                        Он принимает колбэк onDragEnd, который вызывается после завершения перетаскивания . */}
-                        
+
                         <div className={`${style.column_plan} ${style.column}`}>
 
                         <div className={style.column_title}>
                             <h2>в планах</h2>
                         </div>
 
-                        {/* Droppable = зона, куда можно бросить карточки */}
-
                         <Droppable droppableId='plan'>
                             {(provided, snapshot) => (
-                                <div 
+                                <div
                                     className={`${style.list_plan} ${style.list}`}
-                                    ref={provided.innerRef}        // ОБЯЗАТЕЛЬНО — без ref D&D не работает
-                                    {...provided.droppableProps}   // слушатели drop-зоны
-                                    style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}  // подсветка при наведении
+                                    ref={provided.innerRef}
+                                    {...provided.droppableProps}
+                                    style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}
                                 >
 
                                     {board.plan.map((taskName, index) => (
-                                        /* Draggable = одна таска */
-                                        <Draggable 
-                                            key={taskName}            // key для React
-                                            draggableId={taskName}    // уникальный id (если 2 задачи с одним именем — будет ошибка!)
-                                            index={index}             // позиция в массиве — ОБЯЗАТЕЛЬНО
+                                        <Draggable
+                                            key={taskName}
+                                            draggableId={taskName}
+                                            index={index}
                                         >
                                             {(provided, snapshot) => (
                                                 <div
-                                                    ref={provided.innerRef}       // ref на перетаскиваемый элемент
-                                                    {...provided.draggableProps}  // позиция при drag
-                                                    {...provided.dragHandleProps} // за что хвататься (можно только на часть карточки)
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    {...provided.dragHandleProps}
                                                     className={style.task_line}
                                                     style={{
                                                         ...provided.draggableProps.style,
@@ -225,10 +267,9 @@ export const Board = () => {
                                             )}
                                         </Draggable>
                                     ))}
-                                    {/* placeholder — резервирует место, пока тащишь карточку */}
                                     {provided.placeholder}
                                </div>
-                            )} 
+                            )}
                         </Droppable>
 
                         <div className={style.addNewTask_button}>
@@ -251,7 +292,7 @@ export const Board = () => {
                                         {...provided.droppableProps}
                                         style={{backgroundColor: snapshot.isDraggingOver ? '#eee' : ''}}
                                     >
-                                        
+
                                         {board.process.map((taskName,index) => (
                                             <Draggable
                                                 key={taskName}
@@ -260,9 +301,9 @@ export const Board = () => {
                                             >
                                                 {(provided, snapshot) => (
                                                     <div
-                                                    ref={provided.innerRef}       // ref на перетаскиваемый элемент
-                                                    {...provided.draggableProps}  // позиция при drag
-                                                    {...provided.dragHandleProps} // за что хвататься (можно только на часть карточки)
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    {...provided.dragHandleProps}
                                                     className={style.task_line}
                                                     style={{
                                                         ...provided.draggableProps.style,
@@ -275,7 +316,7 @@ export const Board = () => {
                                                     </div>
 
                                                     <hr />
-                                                    
+
                                                 </div>
                                                 )}
                                             </Draggable>
@@ -325,7 +366,7 @@ export const Board = () => {
 
                                                         <hr />
                                                     </div>
-                                                )}       
+                                                )}
                                             </Draggable>
                                         ))}
                                         {provided.placeholder}
@@ -336,7 +377,7 @@ export const Board = () => {
                         </div>
 
                     </DragDropContext>
-                
+
             </div>
         </section>
     )

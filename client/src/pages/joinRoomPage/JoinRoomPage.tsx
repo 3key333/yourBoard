@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import style from './joinRoomPage.module.scss'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
